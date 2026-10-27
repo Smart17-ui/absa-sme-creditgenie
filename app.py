@@ -52,13 +52,26 @@ SAMPLE_DATA = (
 # Simulated provider feeds - stand-ins for the MTN MoMo, Airtel Money and WhatsApp Business APIs.
 # The WhatsApp chat deliberately overlaps the MoMo record so the agent has to de-duplicate.
 SIMULATED_FEEDS = {
+    # Six months of wallet history (April - October), so the demo business passes the continuity rule
     "MTN MoMo": (
+        "MTN MoMo: You have received ZMW 2,600.00 from CHANDA MULENGA (0965550101) on 14/04/2026 10:05. Txn ID 7710233\n"
+        "MTN MoMo: You have received ZMW 2,350.00 from PRISCA BANDA (0965550102) on 09/05/2026 14:20. Txn ID 7745120\n"
+        "MTN MoMo: You have sent ZMW 1,200.00 to KAFUE MILLING (0966550200) on 18/05/2026 08:45. Txn ID 7751904\n"
+        "MTN MoMo: You have received ZMW 3,100.00 from MUSONDA PHIRI (0765550103) on 06/06/2026 11:32. Txn ID 7789341\n"
+        "MTN MoMo: You have received ZMW 2,950.00 from NATASHA ZULU (0965550104) on 09/07/2026 16:10. Txn ID 7820457\n"
+        "MTN MoMo: You have sent ZMW 1,400.00 to KAFUE MILLING (0966550200) on 24/07/2026 09:02. Txn ID 7835112\n"
+        "MTN MoMo: You have received ZMW 3,300.00 from KELVIN TEMBO (0965550105) on 11/08/2026 13:47. Txn ID 7868230\n"
+        "MTN MoMo: You have received ZMW 2,700.00 from ESTHER MWALE (0765550106) on 02/09/2026 10:15. Txn ID 7901786\n"
+        "MTN MoMo: You have sent ZMW 1,250.00 to KAFUE MILLING (0966550200) on 19/09/2026 08:30. Txn ID 7918845\n"
         "MTN MoMo: You have received ZMW 4,000.00 from MAMA CHILESHE (0961234567) on 20/10/2026 09:12. Txn ID 8812734. Bal ZMW 5,240.00\n"
         "MTN MoMo: You have sent ZMW 1,500.00 to KALULU TRANSPORT (0966554433) on 20/10/2026 11:40. Txn ID 8812901. Bal ZMW 3,740.00\n"
         "MTN MoMo: You have received ZMW 2,000.00 from JOSEPH PHIRI (0767889900) on 21/10/2026 15:03. Txn ID 8813550. Bal ZMW 5,740.00\n"
         "MTN MoMo: Payment of ZMW 350.00 to ZESCO prepaid electricity on 22/10/2026 08:05. Txn ID 8814002. Bal ZMW 5,390.00"
     ),
     "Airtel Money": (
+        "Airtel Money: You have received K1,500.00 from LUBASI NYIRENDA 0977881122 on 16/06/2026. TID: PP260616.1105.B21\n"
+        "Airtel Money: You have paid K600.00 for FUEL at Merchant 40213 on 30/06/2026. TID: PP260630.1712.C04\n"
+        "Airtel Money: You have received K1,800.00 from TAONGA BWALYA 0977334455 on 14/08/2026. TID: PP260814.0950.A17\n"
         "Airtel Money: You have received K1,200.00 from BASHI MWANSA 0977123456 on 23/10/2026. TID: PP261023.1422.A55\n"
         "Airtel Money: You have paid K650.00 for FUEL at Merchant 40213 on 23/10/2026. TID: PP261023.1610.C12\n"
         "Airtel Money: You have sent K800.00 to MWILA WHOLESALERS 0975432100 on 24/10/2026. TID: PP261024.0931.D07"
@@ -108,32 +121,40 @@ SAMPLE_SUPPLIERS = ("LUSAKA FRESH PRODUCE", "KAFUE MILLING", "COMESA MARKET TRAD
 def simulated_feed(provider, seed):
     """Sample history for an extra linked number. Seeded by the number, so it is stable and unique."""
     rng = random.Random(seed)
-    days = sorted(rng.sample(range(18, 27), 4))
+    # Spread over different months between April and October 2026
+    days = [f"{rng.randint(1, 28):02d}/{m:02d}/2026" for m in sorted(rng.sample(range(4, 11), 4))]
     amounts = [rng.randrange(400, 3200, 50) for _ in range(4)]
     customers = rng.sample(SAMPLE_CUSTOMERS, 3)
     supplier = rng.choice(SAMPLE_SUPPLIERS)
     if provider == "WhatsApp":
         return "\n".join([
-            f"[{days[0]}/10/2026, 09:{rng.randrange(10, 59)}] {customers[0].title()}: I've sent K{amounts[0]:,} for the order",
-            f"[{days[1]}/10/2026, 18:{rng.randrange(10, 59)}] {customers[1].title()}: Happy Sunday! See you at church",
-            f"[{days[2]}/10/2026, 11:{rng.randrange(10, 59)}] {supplier.title()}: Your invoice of K{amounts[3]:,} "
+            f"[{days[0]}, 09:{rng.randrange(10, 59)}] {customers[0].title()}: I've sent K{amounts[0]:,} for the order",
+            f"[{days[1]}, 18:{rng.randrange(10, 59)}] {customers[1].title()}: Happy Sunday! See you at church",
+            f"[{days[2]}, 11:{rng.randrange(10, 59)}] {supplier.title()}: Your invoice of K{amounts[3]:,} "
             "for stock is due on Friday",
         ])
     name, cur = ("MTN MoMo", "ZMW ") if provider == "MTN MoMo" else ("Airtel Money", "K")
-    lines = [f"{name}: You have received {cur}{amounts[i]:,.2f} from {customers[i]} on {days[i]}/10/2026. "
+    lines = [f"{name}: You have received {cur}{amounts[i]:,.2f} from {customers[i]} on {days[i]}. "
              f"Txn ID {rng.randrange(10**7, 10**8)}" for i in range(3)]
-    lines.append(f"{name}: You have sent {cur}{amounts[3]:,.2f} to {supplier} on {days[3]}/10/2026. "
+    lines.append(f"{name}: You have sent {cur}{amounts[3]:,.2f} to {supplier} on {days[3]}. "
                  f"Txn ID {rng.randrange(10**7, 10**8)}")
     return "\n".join(lines)
 
 
 # 3. Strict output schema - the model must return exactly this shape
 class Transaction(BaseModel):
-    date: str
+    date: str = Field(description="YYYY-MM-DD exactly as shown in the data, or 'Unknown'")
     description: str
     type: Literal["Income", "Expense", "Debt"]
     amount_zmw: float = Field(ge=0)
     source: Literal[SOURCES]
+    document: str = Field(description='For images, the image label exactly as given, e.g. "Receipt: shop.png"; '
+                                      'otherwise an empty string')
+
+
+class SuspiciousDocument(BaseModel):
+    document: str = Field(description='The image label exactly as given, e.g. "Receipt: shop.png"')
+    reason: str = Field(description="Short, factual description of what looks wrong")
 
 
 class CreditAnalysis(BaseModel):
@@ -141,6 +162,7 @@ class CreditAnalysis(BaseModel):
     credit_score: int = Field(ge=1, le=100)
     loan_recommendation_zmw: float = Field(ge=0)
     risk_summary: str
+    suspicious_documents: list[SuspiciousDocument]
 
 
 OUTPUT_RULES = """
@@ -148,7 +170,10 @@ Classify every transaction as one of:
 - "Income": money received by the business.
 - "Expense": money already paid out by the business.
 - "Debt": money the business still owes (e.g. "I owe the supplier"). Do not also list it as an Expense.
-All amounts are positive numbers in ZMW. If a date is not given, use the day mentioned or "Unknown".
+All amounts are positive numbers in ZMW.
+Dates: write every date as YYYY-MM-DD, taken from the data itself (SMS date, chat timestamp, printed
+receipt date). If no full date is written, use "Unknown". NEVER guess or estimate a date - the bank
+uses these dates to check how long the business has been trading.
 Do not calculate totals - they are computed by the bank's system from your transaction list.
 Only use figures that appear in the data. Never invent transactions.
 Orders, quotes or promises to pay in the future are NOT income until the data shows the money was paid.
@@ -160,6 +185,18 @@ MoMo SMS. List each real payment ONCE: when amount, counterparty and date match,
 mobile-money record, because it is the verified one.
 The business may link several of its own wallets. Money moved between its own accounts (e.g. a
 transfer from its MTN wallet to its own Airtel wallet) is NOT income or expense - leave it out.
+
+Absa only lends to businesses with at least 6 months of trading history and sales in several
+different months. If the dated records cover less than that, say so plainly in risk_summary.
+Only MTN MoMo and Airtel Money records are verified. Pasted text, chats and images are self-reported
+and could be faked: use them as supporting context, and be sceptical of large or unusual amounts
+that no wallet record confirms.
+
+Document check: look at every image for signs it was faked or edited - numbers in a different font,
+size or alignment from the rest, totals that don't add up, impossible or future dates, no business
+name, or signs of photo editing. List each such document in suspicious_documents with a short,
+factual reason. Return an empty list if nothing looks wrong. Do not lower the score because of it:
+an analyst reviews every flag, and a blurry photo of a real receipt is not fraud.
 """
 
 PERSONA_INSTRUCTIONS = {
@@ -168,7 +205,7 @@ PERSONA_INSTRUCTIONS = {
     Your job is to protect the bank from bad loans while still supporting Zambian SMEs.
 
     Analyze the text/image to find all income, expenses and outstanding debts.
-    - If the business is making a profit after debts, calculate a safe loan amount (max 3x their profit).
+    - If the business is making a profit after debts, calculate a safe loan amount (max 3x their average monthly profit).
     - If expenses plus debts are higher than the income, the credit score must be below 40 and the loan recommendation must be 0.
     - "risk_summary": 2 sentences explaining the risk level and why you approved or denied the loan.
     """,
@@ -176,7 +213,7 @@ PERSONA_INSTRUCTIONS = {
     You are an AI Financial Inclusion Officer at Absa Bank Zambia.
     Your goal is to help informal SME business owners formalize their business and access capital to grow.
 
-    Assume the data provided represents a typical week of business. Annualize the weekly profit to estimate their yearly cash flow.
+    Work out their average monthly profit from the dated records and use it to estimate their yearly cash flow.
     Give a highly encouraging but realistic credit score based on their hustle and cash flow.
     - "risk_summary": 2 sentences explaining their financial health and how Absa can help them grow.
     """,
@@ -255,27 +292,145 @@ def redact(text, mask_names, name_map):
 
 
 # 5. Deterministic credit policy - the AI proposes, the bank's rules decide
-def apply_policy(persona, analysis, totals, requested_zmw=None):
+MIN_HISTORY_DAYS = 180   # about 6 months between the oldest and newest dated record
+MIN_ACTIVE_MONTHS = 4    # sales in at least this many different calendar months
+DAYS_PER_MONTH = 30.4
+
+
+def parse_date(text):
+    """A transaction date the bank can rely on, or None. Future dates don't count."""
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            d = datetime.datetime.strptime(text.strip(), fmt).date()
+        except (ValueError, AttributeError):
+            continue
+        return d if d <= datetime.date.today() else None
+    return None
+
+
+def trading_history(transactions):
+    """How long, and how regularly, the records show the business trading.
+    Only dated wallet records (MTN MoMo / Airtel Money) count: typed, pasted or photographed records
+    can be faked, so they can't prove how long a business has traded."""
+    undated = sum(1 for t in transactions if parse_date(t.date) is None)
+    dated = [(d, t) for t in transactions if t.source in VERIFIED_SOURCES and (d := parse_date(t.date))]
+    if not dated:
+        return {"dated_transactions": 0, "undated_transactions": undated, "first": None,
+                "last": None, "span_days": 0, "months": 0.0, "active_months": 0}
+    dates = [d for d, _ in dated]
+    span = (max(dates) - min(dates)).days
+    return {
+        "dated_transactions": len(dated),
+        "undated_transactions": undated,
+        "first": min(dates).isoformat(),
+        "last": max(dates).isoformat(),
+        "span_days": span,
+        "months": round(span / DAYS_PER_MONTH, 1),
+        "active_months": len({(d.year, d.month) for d, t in dated if t.type == "Income"}),
+    }
+
+
+NOT_COUNTED = ("Confirms a wallet record", "Flagged document - not counted")
+
+
+def cross_check(ledger, flagged_documents):
+    """Label every record by how far it can be trusted. A self-reported record (receipt, chat, pasted
+    text) that matches a wallet payment - same type, amount within 1%, date within 3 days - confirms
+    that payment, and is not counted a second time. Records from a document flagged for possible
+    tampering are set aside until an analyst has looked at it."""
+    wallet = [(parse_date(w["date"]), w) for w in ledger if w["source"] in VERIFIED_SOURCES]
+    for t in ledger:
+        if t["source"] in VERIFIED_SOURCES:
+            t["evidence"] = "Wallet record"
+            continue
+        if t["document"].strip() and t["document"].strip() in flagged_documents:
+            t["evidence"] = "Flagged document - not counted"
+            continue
+        d = parse_date(t["date"])
+        confirms = d is not None and any(
+            wd is not None and w["type"] == t["type"] and abs((wd - d).days) <= 3
+            and abs(w["amount_zmw"] - t["amount_zmw"]) <= max(1.0, 0.01 * w["amount_zmw"])
+            for wd, w in wallet
+        )
+        t["evidence"] = "Confirms a wallet record" if confirms else "Self-reported"
+    return ledger
+
+
+def apply_policy(persona, analysis, totals, history, requested_zmw=None):
+    """Returns (score, loan, notes for the analyst, reasons the customer can act on)."""
     score = analysis.credit_score
     loan = analysis.loan_recommendation_zmw
     notes = []
+    reasons = []
     free_cash = totals["net_cash_flow"] - totals["outstanding_debt"]
+    since = (datetime.date.today() - datetime.timedelta(days=MIN_HISTORY_DAYS)).strftime("%B %Y")
 
-    if free_cash <= 0 and loan > 0:
-        notes.append("Loan set to ZMW 0: expenses plus debts meet or exceed income.")
+    # Fraud guard: typed, pasted and photographed records can be faked, so a loan needs wallet records
+    verified_free_cash = totals["verified_income"] - totals["total_expense"] - totals["outstanding_debt"]
+    if totals["verified_income"] <= 0:
+        reasons.append({
+            "rule": "Verified wallet",
+            "reason": "Your application only has records you typed, pasted or photographed. We can't check "
+                      "these, so Absa can't lend on them alone.",
+            "fix": "Connect your MTN MoMo or Airtel Money wallet so we can confirm your sales.",
+        })
+    elif history["dated_transactions"] < 2:
+        reasons.append({
+            "rule": "Dated records",
+            "reason": "Too few of your wallet records show a date, so we can't see how long your business "
+                      "has been trading.",
+            "fix": "Connect the wallet you use most for your business.",
+        })
+    elif history["span_days"] < MIN_HISTORY_DAYS:
+        first = datetime.date.fromisoformat(history["first"]).strftime("%d %b %Y")
+        last = datetime.date.fromisoformat(history["last"]).strftime("%d %b %Y")
+        reasons.append({
+            "rule": "6 months of history",
+            "reason": f"Your wallet records cover {history['span_days']} days ({first} to {last}). "
+                      "Absa needs at least 6 months of trading history.",
+            "fix": f"Connect a wallet you have used for your business since {since}.",
+        })
+    elif history["active_months"] < MIN_ACTIVE_MONTHS:
+        reasons.append({
+            "rule": "Regular sales",
+            "reason": f"Your wallet records show sales in only {history['active_months']} month(s). "
+                      f"Absa looks for sales in at least {MIN_ACTIVE_MONTHS} different months.",
+            "fix": "Connect any other wallet you receive customer payments on.",
+        })
+    if free_cash <= 0:
+        reasons.append({
+            "rule": "Positive cash flow",
+            "reason": "Your recorded expenses and debts are equal to or higher than your income.",
+            "fix": "Share any income records that are missing, or apply again once debts are paid down.",
+        })
+    elif totals["verified_income"] > 0 and verified_free_cash <= 0:
+        reasons.append({
+            "rule": "Verified cash flow",
+            "reason": "The income in your connected wallets doesn't cover your expenses and debts. "
+                      "Income we can't check isn't enough to lend on.",
+            "fix": "Connect any other wallet you receive customer payments on.",
+        })
+
+    if reasons:
+        if loan > 0:
+            notes.append(f"Loan set to ZMW 0 (AI proposed ZMW {loan:,.0f}): "
+                         + ", ".join(r["rule"] for r in reasons) + " not met.")
         loan = 0
-    if persona == "Strict Risk Manager":
-        if free_cash <= 0 and score >= 40:
-            notes.append(f"Score capped at 39 (AI proposed {score}): negative cash flow after debts.")
-            score = 39
-        if free_cash > 0 and loan > 3 * free_cash:
-            notes.append(f"Loan capped at 3x free cash flow (AI proposed ZMW {loan:,.0f}).")
-            loan = 3 * free_cash
+    if persona == "Strict Risk Manager" and free_cash <= 0 and score >= 40:
+        notes.append(f"Score capped at 39 (AI proposed {score}): negative cash flow after debts.")
+        score = 39
+    # Size the loan on verified money only: wallet income minus ALL expenses and debts, so income
+    # nobody can check (typed, pasted, photographed) never makes the loan bigger
+    verified_monthly_free_cash = verified_free_cash / max(1.0, history["months"])
+    if loan > 0 and loan > 3 * verified_monthly_free_cash:
+        notes.append(f"Loan capped at 3x verified monthly free cash flow of ZMW {verified_monthly_free_cash:,.0f} "
+                     f"(wallet income minus all expenses and debts; AI proposed ZMW {loan:,.0f}).")
+        loan = 3 * verified_monthly_free_cash
     if requested_zmw and loan > requested_zmw:
         notes.append(f"Loan limited to the ZMW {requested_zmw:,.0f} the business applied for.")
         loan = requested_zmw
 
-    return score, round(loan, 2), notes
+    return score, round(loan, 2), notes, reasons
 
 
 def compute_totals(transactions):
@@ -291,6 +446,7 @@ def compute_totals(transactions):
         "total_expense": expense,
         "outstanding_debt": debt,
         "net_cash_flow": round(income - expense, 2),
+        "verified_income": round(verified_income, 2),
         # Share of income backed by a mobile-money record rather than a chat message or claim
         "verified_income_pct": round(100 * verified_income / income) if income else 0,
     }
@@ -485,6 +641,7 @@ def empty_case():
         "case_id": f"CASE-{uuid.uuid4().hex[:6].upper()}",
         "opened_at": now_iso(),
         "ledger": [],     # every transaction found so far (already redacted)
+        "flags": [],      # documents the AI flagged for possible tampering
         "processed": {},  # input fingerprint -> label, so the same evidence is never counted twice
         "name_map": {},   # real name -> "Customer X"; kept in memory only, never exported
         "history": [],    # one entry per assessment run
@@ -679,11 +836,15 @@ def sme_portal():
                 st.success(f"Good news! Absa can offer you **ZMW {decision['amount_zmw']:,.0f}**. "
                            "A relationship manager will contact you to finalise the loan.", icon=":material/celebration:")
             elif app["status"] == "Declined":
-                st.error("We are unable to offer a loan at this time. You are welcome to apply again "
-                         "once your business has more transaction history.", icon=":material/info:")
+                st.error("We are unable to offer a loan at this time.", icon=":material/info:")
             elif app["status"] == "More info requested":
-                st.warning(f"**Absa needs more information:** {decision['note']}  \n"
-                           "Add the documents below and send them to Absa.", icon=":material/help:")
+                st.warning("**Absa needs more information.** Add the documents below and send them to Absa."
+                           + (f"  \n{decision['note']}" if decision["note"] else ""), icon=":material/help:")
+            reasons = (decision or {}).get("reasons", [])
+            if reasons:
+                why_col, fix_col = st.columns(2, gap="large")
+                why_col.markdown("**Why**  \n" + "  \n".join(f"- {r['reason']}" for r in reasons))
+                fix_col.markdown("**What you can do**  \n" + "  \n".join(f"- {r['fix']}" for r in reasons))
             else:
                 st.info("Thank you - your application is with an Absa credit analyst. "
                         "You can still send extra documents below.", icon=":material/hourglass_top:")
@@ -833,6 +994,9 @@ def sme_portal():
             st.warning(f"Please send at most {MAX_IMAGES_PER_RUN} images at a time.")
         if connection is None:
             st.caption("Verify your business number in step 1 to continue.")
+        elif not any(a["provider"] in VERIFIED_SOURCES for a in st.session_state.linked.values()):
+            st.info("You can apply with receipts and messages, but Absa can only lend once you connect an "
+                    "MTN MoMo or Airtel Money wallet - that's how we confirm your sales.", icon=":material/info:")
 
         clicked = st.button("Send to Absa" if app else "Submit application", type="primary",
                             icon=":material/send:", width="stretch",
@@ -942,16 +1106,36 @@ def run_analysis(persona, case, app, new_items, log):
         redactions += n
 
     audit_id = f"CG-{uuid.uuid4().hex[:10].upper()}"
-    ledger = case["ledger"] + [{**t.model_dump(), "added_by": audit_id} for t in analysis.synthetic_transactions]
-    totals = compute_totals([Transaction(**t) for t in ledger])
-    step(f"Rules engine computed totals over all {len(ledger)} transaction(s) in the case")
-    score, loan, notes = apply_policy(persona, analysis, totals, app["requested_zmw"])
-    step(f"Absa credit policy applied: {len(notes)} guardrail(s) triggered")
+    flags = case["flags"] + [f.model_dump() for f in analysis.suspicious_documents]
+    ledger = cross_check(case["ledger"] + [{**t.model_dump(), "added_by": audit_id}
+                                           for t in analysis.synthetic_transactions],
+                         {f["document"].strip() for f in flags})
+    # A record that only confirms a wallet payment is evidence, not extra money; records from a
+    # flagged document wait for the analyst instead of moving the numbers either way
+    transactions = [Transaction(**t) for t in ledger if t["evidence"] not in NOT_COUNTED]
+    totals = compute_totals(transactions)
+    history = trading_history(transactions)
+    confirmed = sum(t["evidence"] == "Confirms a wallet record" for t in ledger)
+    unchecked = sum(t["evidence"] == "Self-reported" for t in ledger)
+    set_aside = sum(t["evidence"] == "Flagged document - not counted" for t in ledger)
+    step(f"Cross-check: {confirmed} self-reported record(s) confirm a wallet payment and were not counted twice; "
+         f"{unchecked} can't be checked against a wallet")
+    step(f"Document check: {len(analysis.suspicious_documents)} new document(s) flagged for possible tampering; "
+         f"{set_aside} record(s) from flagged documents set aside until reviewed"
+         if analysis.suspicious_documents else "Document check: no signs of tampering in new documents")
+    step(f"Rules engine computed totals over {len(transactions)} transaction(s) in the case")
+    step(f"Verified history: {history['span_days']} days of wallet records with sales in "
+         f"{history['active_months']} month(s); {totals['verified_income_pct']}% of income is wallet-verified; "
+         f"{history['undated_transactions']} undated record(s) not counted")
+    score, loan, notes, reasons = apply_policy(persona, analysis, totals, history, app["requested_zmw"])
+    step(f"Absa credit policy applied: {len(notes)} guardrail(s) triggered"
+         + (f"; loan blocked - {', '.join(r['rule'] for r in reasons)} not met" if reasons else ""))
     step(f"Audit report {audit_id} generated - awaiting analyst decision")
 
     generated_at = now_iso()
     previous = list(case["history"])
     case["ledger"] = ledger
+    case["flags"] = flags
     case["processed"].update({e["fp"]: e["label"] for e in new_items})
     case["history"].append({
         "audit_id": audit_id, "generated_at": generated_at, "persona": persona,
@@ -985,6 +1169,11 @@ def run_analysis(persona, case, app, new_items, log):
             "recommended_loan_zmw": loan,
             "ai_proposed_credit_score": analysis.credit_score,
             "ai_proposed_loan_zmw": analysis.loan_recommendation_zmw,
+            "trading_history": history,
+            "decline_reasons": reasons,
+            "suspicious_documents": flags,
+            "self_reported_confirmed": confirmed,
+            "self_reported_unchecked": unchecked,
         },
         "policy_guardrails_applied": notes,
         "agent_summary": analysis.risk_summary,
@@ -1015,6 +1204,8 @@ def credit_band(score):
 def ai_recommendation(res):
     if res["recommended_loan_zmw"] <= 0:
         return "Decline", ":material/cancel:", "red"
+    if res["suspicious_documents"]:
+        return "Refer - check documents", ":material/gpp_maybe:", "orange"
     if res["credit_score"] >= 70:
         return "Approve", ":material/check_circle:", "green"
     return "Approve with conditions", ":material/info:", "orange"
@@ -1022,6 +1213,7 @@ def ai_recommendation(res):
 
 def kpi_tiles(report):
     res = report["result"]
+    history = res["trading_history"]
     score = res["credit_score"]
     band = credit_band(score)
     previous = report["previous_assessments"]
@@ -1030,8 +1222,13 @@ def kpi_tiles(report):
     if previous:
         change = score - previous[-1]["credit_score"]
         score_note += f" · {change:+d} vs last" if change else " · unchanged vs last"
-    loan_note = ("Capped by Absa policy" if res["recommended_loan_zmw"] < res["ai_proposed_loan_zmw"]
-                 else "Within Absa policy")
+    if res["decline_reasons"]:
+        loan_note = "Blocked by Absa policy"
+    elif res["recommended_loan_zmw"] < res["ai_proposed_loan_zmw"]:
+        loan_note = "Capped by Absa policy"
+    else:
+        loan_note = "Within Absa policy"
+    period = f"{history['months']} months" if history["dated_transactions"] >= 2 else "period unknown"
 
     def money(value):
         return f'<span class="cg-cur">ZMW</span>{value:,.0f}'
@@ -1042,10 +1239,14 @@ def kpi_tiles(report):
         ("Credit score", f'{score}<span class="cg-unit">/100</span>', score_note, meter),
         ("Recommended loan", money(res["recommended_loan_zmw"]),
          f"{loan_note} · asked ZMW {report['application']['requested_zmw']:,.0f}", ""),
-        ("Net cash flow", money(res["net_cash_flow"]), "Income minus expenses", ""),
+        ("Net cash flow", money(res["net_cash_flow"]), f"Income minus expenses · {period}", ""),
         ("Outstanding debt", money(res["outstanding_debt"]), "Owed, not yet paid", ""),
         ("Verified income", f'{res["verified_income_pct"]}<span class="cg-unit">%</span>',
          "Backed by MTN / Airtel records", ""),
+        ("Verified history", f'{history["months"]}<span class="cg-unit">months</span>',
+         f"Sales in {history['active_months']} month(s) · "
+         + ("meets the 6-month rule" if history["span_days"] >= MIN_HISTORY_DAYS
+            and history["active_months"] >= MIN_ACTIVE_MONTHS else "needs 6 months"), ""),
     ]
     st.html('<div class="cg-kpis">' + "".join(
         f'<div class="cg-kpi"><div class="cg-kpi-label">{label}</div><div class="cg-kpi-value">{value}</div>'
@@ -1063,7 +1264,12 @@ def record_decision(report, app):
     recommended = report["result"]["recommended_loan_zmw"]
     override = (outcome == "Approve" and amount > recommended) or (outcome == "Decline" and recommended > 0)
 
-    if outcome != "Approve" and not note:
+    if outcome == "Approve" and amount <= 0:
+        flash("error", "Enter the loan amount to offer, or choose Decline.")
+        return
+    reasons = report["result"]["decline_reasons"] if outcome != "Approve" else []
+    # The policy reasons already tell the customer why; otherwise the analyst must explain
+    if outcome != "Approve" and not note and not reasons:
         flash("error", "Add a note explaining the decision - the customer will see it.")
         return
     if override and not note:
@@ -1078,6 +1284,7 @@ def record_decision(report, app):
         "decided_at": now_iso(),
         "analyst": "Demo Analyst (simulated login)",
         "based_on_audit_id": report["audit_id"],
+        "reasons": reasons,
     }
     report["analyst_decision"] = decision
     app["decision"] = decision
@@ -1176,6 +1383,17 @@ def analyst_dashboard():
             st.badge(credit_band(res["credit_score"]), color="gray")
 
         kpi_tiles(report)
+        if res["decline_reasons"]:
+            st.error("**Absa policy blocks this loan, whatever the AI score**  \n"
+                     + "  \n".join(f"- **{r['rule']}:** {r['reason']}" for r in res["decline_reasons"]),
+                     icon=":material/gpp_bad:")
+        if res["suspicious_documents"]:
+            st.warning("**Possible tampering - check these documents before deciding**  \n"
+                       + "  \n".join(f"- **{html.escape(f['document'])}:** {f['reason']}"
+                                     for f in res["suspicious_documents"])
+                       + "  \nTheir records are set aside - not counted as income or expenses - so they can't "
+                         "help or hurt the score. The AI can be wrong (for example with a blurry photo), so ask "
+                         "the customer for a clearer copy or the original.", icon=":material/gpp_maybe:")
 
         overview_tab, tx_tab, history_tab, audit_tab = st.tabs(
             ["Overview", "Transactions", "Case history", "Audit trail"]
@@ -1214,6 +1432,9 @@ def analyst_dashboard():
                     st.markdown("**Policy guardrails applied**")
                     for note in report["policy_guardrails_applied"]:
                         st.warning(note, icon=":material/gavel:")
+                elif res["decline_reasons"]:
+                    st.info("The AI also recommended no loan. The policy reasons are listed above.",
+                            icon=":material/gavel:")
                 else:
                     st.success("AI recommendation is within Absa credit policy.", icon=":material/gavel:")
 
@@ -1230,6 +1451,8 @@ def analyst_dashboard():
                     "type": "Type",
                     "amount_zmw": st.column_config.NumberColumn("Amount (ZMW)", format="%,.2f"),
                     "source": "Source",
+                    "document": "Document",
+                    "evidence": "Evidence",
                     "added_by": "Added in",
                 },
             )
@@ -1273,6 +1496,20 @@ def analyst_dashboard():
                     (report["privacy"]["names_masked"], "Customer names masked",
                      "Names replaced with Customer A, B, C" if report["privacy"]["names_masked"]
                      else "Not applied - use Synthetic Data Engineer to mask names"),
+                    (res["verified_income_pct"] > 0, "Verified data",
+                     f"{res['verified_income_pct']}% of income backed by MTN / Airtel wallet records"
+                     if res["verified_income_pct"] else "No wallet records - only self-reported data"),
+                    (not any(r["rule"] in ("Verified wallet", "Dated records", "6 months of history", "Regular sales", "Verified cash flow")
+                             for r in res["decline_reasons"]), "Verified history",
+                     f"{res['trading_history']['span_days']} days of wallet records, sales in "
+                     f"{res['trading_history']['active_months']} month(s) (needs {MIN_HISTORY_DAYS} days, "
+                     f"{MIN_ACTIVE_MONTHS} months)"),
+                    (True, "Receipts cross-checked",
+                     f"{res['self_reported_confirmed']} self-reported record(s) confirm a wallet payment; "
+                     f"{res['self_reported_unchecked']} can't be checked and don't count towards the loan size"),
+                    (not res["suspicious_documents"], "Document checks",
+                     f"{len(res['suspicious_documents'])} document(s) flagged for possible tampering"
+                     if res["suspicious_documents"] else "No signs of tampering found"),
                     (True, "Policy guardrails", f"{len(report['policy_guardrails_applied'])} applied by the rules engine"),
                     (report["analyst_decision"] is not None, "Human decision",
                      "Recorded by analyst" if report["analyst_decision"] else "Awaiting your decision"),
@@ -1311,7 +1548,15 @@ def analyst_dashboard():
             st.caption("Run a new assessment to make another decision.")
         else:
             st.caption("The AI recommends; you decide. Your decision is sent to the SME Portal and stored in the audit report.")
-            default_outcome = "Decline" if res["recommended_loan_zmw"] <= 0 else "Approve"
+            if res["decline_reasons"]:
+                st.caption(":material/info: If you decline or ask for more information, the customer sees the "
+                           "policy reasons above and what they can do about each one.")
+            if res["recommended_loan_zmw"] <= 0:
+                default_outcome = "Decline"
+            elif res["suspicious_documents"]:
+                default_outcome = "Request more info"
+            else:
+                default_outcome = "Approve"
             suffix = report["audit_id"]
             outcome = st.segmented_control("Outcome", ("Approve", "Request more info", "Decline"),
                                            default=default_outcome, required=True,
