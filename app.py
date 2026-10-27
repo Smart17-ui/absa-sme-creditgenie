@@ -6,6 +6,7 @@ import hmac
 import json
 import time
 import uuid
+import random
 import secrets
 import hashlib
 import datetime
@@ -99,6 +100,33 @@ def keep_money_messages(text):
     return "\n".join(kept), len(lines) - len(kept)
 
 
+MAX_NUMBERS_PER_PROVIDER = 3
+SAMPLE_CUSTOMERS = ("CHANDA MULENGA", "PRISCA BANDA", "MUSONDA PHIRI", "NATASHA ZULU", "KELVIN TEMBO", "ESTHER MWALE")
+SAMPLE_SUPPLIERS = ("LUSAKA FRESH PRODUCE", "KAFUE MILLING", "COMESA MARKET TRADERS")
+
+
+def simulated_feed(provider, seed):
+    """Sample history for an extra linked number. Seeded by the number, so it is stable and unique."""
+    rng = random.Random(seed)
+    days = sorted(rng.sample(range(18, 27), 4))
+    amounts = [rng.randrange(400, 3200, 50) for _ in range(4)]
+    customers = rng.sample(SAMPLE_CUSTOMERS, 3)
+    supplier = rng.choice(SAMPLE_SUPPLIERS)
+    if provider == "WhatsApp":
+        return "\n".join([
+            f"[{days[0]}/10/2026, 09:{rng.randrange(10, 59)}] {customers[0].title()}: I've sent K{amounts[0]:,} for the order",
+            f"[{days[1]}/10/2026, 18:{rng.randrange(10, 59)}] {customers[1].title()}: Happy Sunday! See you at church",
+            f"[{days[2]}/10/2026, 11:{rng.randrange(10, 59)}] {supplier.title()}: Your invoice of K{amounts[3]:,} "
+            "for stock is due on Friday",
+        ])
+    name, cur = ("MTN MoMo", "ZMW ") if provider == "MTN MoMo" else ("Airtel Money", "K")
+    lines = [f"{name}: You have received {cur}{amounts[i]:,.2f} from {customers[i]} on {days[i]}/10/2026. "
+             f"Txn ID {rng.randrange(10**7, 10**8)}" for i in range(3)]
+    lines.append(f"{name}: You have sent {cur}{amounts[3]:,.2f} to {supplier} on {days[3]}/10/2026. "
+                 f"Txn ID {rng.randrange(10**7, 10**8)}")
+    return "\n".join(lines)
+
+
 # 3. Strict output schema - the model must return exactly this shape
 class Transaction(BaseModel):
     date: str
@@ -130,6 +158,8 @@ section it came from ("MTN MoMo", "Airtel Money", "WhatsApp", "Pasted text" or "
 The same payment often appears twice, e.g. a WhatsApp message "I've sent the 4,000" and the matching
 MoMo SMS. List each real payment ONCE: when amount, counterparty and date match, keep only the
 mobile-money record, because it is the verified one.
+The business may link several of its own wallets. Money moved between its own accounts (e.g. a
+transfer from its MTN wallet to its own Airtel wallet) is NOT income or expense - leave it out.
 """
 
 PERSONA_INSTRUCTIONS = {
@@ -361,45 +391,50 @@ def load_sample():
     st.session_state.messy_data = SAMPLE_DATA
 
 
-def sync_feed(source):
-    time.sleep(0.8)  # simulate the network round-trip of a live API fetch
-    st.session_state.synced[source] = (SIMULATED_FEEDS[source], datetime.datetime.now())
+# An SME may run several wallets and use different numbers for MoMo, Airtel Money and WhatsApp.
+# Each linked number must be proven: either it is the verified primary number, or it gets its own SMS code.
+def accounts_for(provider):
+    return {aid: a for aid, a in st.session_state.linked.items() if a["provider"] == provider}
 
 
-# An SME may use different numbers for MoMo, Airtel Money and WhatsApp. Each linked number must be
-# proven: either it is the verified primary number, or it gets its own SMS code.
-def link_account(source, phone_masked, phone_sha256, network, verification):
-    st.session_state.linked[source] = {
+def link_account(provider, phone_masked, phone_sha256, network, verification):
+    account_id = f"{provider}|{phone_sha256[:12]}"
+    # The first number keeps the demo story; extra numbers get their own sample history
+    feed = SIMULATED_FEEDS[provider] if not accounts_for(provider) else simulated_feed(provider, phone_sha256)
+    st.session_state.linked[account_id] = {
+        "provider": provider,
         "phone_masked": phone_masked,
         "phone_sha256": phone_sha256,
         "network": network,
         "verification": verification,
         "linked_at": now_iso(),
     }
-    sync_feed(source)
-    st.session_state.toast = f"{source} linked to {phone_masked}"
+    time.sleep(0.8)  # simulate the network round-trip of a live API fetch
+    st.session_state.synced[account_id] = (feed, datetime.datetime.now())
+    st.session_state.toast = f"{provider} linked to {phone_masked}"
 
 
-def unlink_account(source):
-    st.session_state.linked.pop(source, None)
-    st.session_state.synced.pop(source, None)
+def unlink_account(account_id):
+    st.session_state.linked.pop(account_id, None)
+    st.session_state.synced.pop(account_id, None)
 
 
 @st.dialog("Link an account")
 def link_account_dialog(source):
     connection = st.session_state.connection
     required = PROVIDER_NETWORK[source]
+    already = {a["phone_sha256"] for a in accounts_for(source).values()}
     st.markdown(f"#### {source}")
     st.caption(LINK_HELP[source])
 
-    if required is None or connection["network"] == required:
+    if (required is None or connection["network"] == required) and connection["phone_sha256"] not in already:
         if st.button(f"Use my verified number {connection['phone_masked']}", type="primary", width="stretch",
                      icon=":material/verified_user:"):
             link_account(source, connection["phone_masked"], connection["phone_sha256"], connection["network"],
                          "Primary number (verified at sign-up)")
             st.rerun()
         st.markdown("**Or link a different number**")
-    else:
+    elif required and connection["network"] != required:
         st.info(f"Your verified number is on {connection['network']}. Enter your {required} number - "
                 "we'll send it a code to prove it's yours.", icon=":material/info:")
 
@@ -408,6 +443,8 @@ def link_account_dialog(source):
         phone = normalise_phone(raw)
         if phone is None:
             st.error("Enter a valid Zambian mobile number, e.g. 097 123 4567.")
+        elif hashlib.sha256(phone.encode()).hexdigest() in already:
+            st.error(f"{mask_phone(phone)} is already linked to {source}.")
         elif required and NETWORK_BY_PREFIX[phone[4:6]] != required:
             article = "an" if required[0] in "AEIOU" else "a"
             st.error(f"That is {'an' if NETWORK_BY_PREFIX[phone[4:6]][0] in 'AEIOU' else 'a'} "
@@ -698,30 +735,39 @@ def sme_portal():
             for source, icon in zip(SIMULATED_FEEDS, (":material/phone_android:",
                                                        ":material/account_balance_wallet:",
                                                        ":material/chat:")):
-                name_col, status_col, btn_col = st.columns([3, 3, 2], vertical_alignment="center")
-                link = st.session_state.linked.get(source)
+                accounts = accounts_for(source)
                 label = "WhatsApp Business" if source == "WhatsApp" else source
-                name_col.markdown(f"{icon} **{label}**  \n"
-                                  + (f":gray[{link['phone_masked']} · {link['network']}]" if link
-                                     else ":gray[Not linked]"))
-                if link:
-                    synced_at = st.session_state.synced[source][1]
-                    status_col.badge(f"Linked · synced {synced_at:%H:%M}", icon=":material/check:", color="green")
-                    btn_col.button("Unlink", key=f"unlink_{source}", on_click=unlink_account, args=(source,),
-                                   icon=":material/link_off:", type="tertiary", width="stretch")
+                name_col, status_col, btn_col = st.columns([3, 3, 2], vertical_alignment="center")
+                name_col.markdown(f"{icon} **{label}**")
+                if accounts:
+                    status_col.badge(f"{len(accounts)} of {MAX_NUMBERS_PER_PROVIDER} numbers linked",
+                                     icon=":material/check:", color="green")
+                elif connection:
+                    status_col.badge("Ready to link", color="gray")
                 else:
-                    if connection:
-                        status_col.badge("Ready to link", color="gray")
-                    else:
-                        status_col.badge("Verify first", icon=":material/lock:", color="gray")
-                    if btn_col.button("Connect", key=f"sync_{source}", disabled=connection is None,
-                                      icon=":material/add_link:", width="stretch"):
-                        link_account_dialog(source)
+                    status_col.badge("Verify first", icon=":material/lock:", color="gray")
+                full = len(accounts) >= MAX_NUMBERS_PER_PROVIDER
+                if btn_col.button("Add number" if accounts else "Connect", key=f"sync_{source}",
+                                  disabled=connection is None or full, icon=":material/add_link:", width="stretch",
+                                  help=f"Up to {MAX_NUMBERS_PER_PROVIDER} numbers" if full else None):
+                    link_account_dialog(source)
+                for account_id, account in accounts.items():
+                    num_col, info_col, unlink_col = st.columns([3, 3, 2], vertical_alignment="center")
+                    num_col.markdown(f":gray[:material/subdirectory_arrow_right:] {account['phone_masked']} · "
+                                     f"{account['network']}")
+                    info_col.caption(f"{account['verification']} · synced "
+                                     f"{st.session_state.synced[account_id][1]:%H:%M}")
+                    unlink_col.button("Unlink", key=f"unlink_{account_id}", on_click=unlink_account,
+                                      args=(account_id,), icon=":material/link_off:", type="tertiary",
+                                      width="stretch")
             if st.session_state.synced:
                 with st.expander("Preview what will be shared"):
-                    for s, (feed, _) in st.session_state.synced.items():
-                        shown, removed = keep_money_messages(feed) if s == "WhatsApp" else (feed, 0)
-                        st.markdown(f"**{s}**" + (f" · :green[{removed} personal message(s) removed]" if removed else ""))
+                    for account_id, (feed, _) in st.session_state.synced.items():
+                        account = st.session_state.linked[account_id]
+                        shown, removed = (keep_money_messages(feed) if account["provider"] == "WhatsApp"
+                                          else (feed, 0))
+                        st.markdown(f"**{account['provider']}** · {account['phone_masked']}"
+                                    + (f" · :green[{removed} personal message(s) removed]" if removed else ""))
                         st.text(shown)
 
         with tab_image:
@@ -745,10 +791,12 @@ def sme_portal():
     # Everything on screen that hasn't been sent to Absa yet. Chats are cut down to money messages
     # here, in the portal, so personal messages never reach the bank or the AI.
     evidence = []
-    for source, (feed, _) in st.session_state.synced.items():
+    for account_id, (feed, _) in st.session_state.synced.items():
+        account = st.session_state.linked[account_id]
+        source = account["provider"]
         text, removed = keep_money_messages(feed) if source == "WhatsApp" else (feed, 0)
-        evidence.append({"fp": fingerprint(text.encode()), "label": f"{source} feed", "source": source,
-                         "text": text, "filtered_out": removed})
+        evidence.append({"fp": fingerprint(text.encode()), "label": f"{source} {account['phone_masked']}",
+                         "source": source, "text": text, "filtered_out": removed})
     if messy_data.strip():
         text, removed = keep_money_messages(messy_data)
         if text:
@@ -1062,7 +1110,7 @@ def analyst_dashboard():
                          f"submitted {pretty_time(app['submitted_at'])}")
         if app["linked_accounts"]:
             head_col.caption("Linked accounts: " + " · ".join(
-                f"{source} {link['phone_masked']}" for source, link in app["linked_accounts"].items()))
+                f"{link['provider']} {link['phone_masked']}" for link in app["linked_accounts"].values()))
         with badge_col.container(horizontal=True, horizontal_alignment="right"):
             status_badge(app["status"])
         with st.container(horizontal=True):
