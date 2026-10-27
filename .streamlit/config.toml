@@ -1,0 +1,10 @@
+[server]
+maxUploadSize = 10  # MB per file - a receipt photo is well under this
+
+[theme]
+base = "light"
+primaryColor = "#DC0032"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F1F2"
+textColor = "#1E1E1E"
+font = "sans serif"
