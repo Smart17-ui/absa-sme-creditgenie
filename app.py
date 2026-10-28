@@ -25,7 +25,7 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
-st.set_page_config(page_title="Absa SME CreditGenie", layout="wide")
+st.set_page_config(page_title="Absa SME CreditGenie", page_icon=":material/account_balance:", layout="wide")
 
 if not api_key:
     st.error("API Key not found. Please check your .env file.")
@@ -669,75 +669,174 @@ case = st.session_state.case
 application = st.session_state.application
 
 
-# 8. Look & feel - Absa-branded header, step cards, KPI tiles and sidebar
+# 8. Look & feel - Absa-branded header, step cards, KPI tiles, AI insight panel and sidebar
 st.html("""
 <style>
   [data-testid="stAppDeployButton"], #MainMenu, footer { display: none; }
-  .block-container, [data-testid="stMainBlockContainer"] { padding-top: 3.2rem; max-width: 1280px; }
+  [data-testid="stMainBlockContainer"] { max-width: 1240px; }
+  h1, h2, h3, h4 { letter-spacing: -0.015em; }
+
+  /* Cards: white surfaces on a soft grey canvas */
+  [class*="st-key-cg_card_"] {
+    background: #FFFFFF; border-color: #E6E1E7 !important; border-radius: 14px !important;
+    box-shadow: 0 1px 2px rgba(23, 19, 26, 0.04), 0 6px 20px -8px rgba(23, 19, 26, 0.08);
+    padding: 1.1rem 1.25rem !important;
+  }
+  .st-key-cg_card_trust { background: linear-gradient(90deg, #FFF5F7 0%, #FFFFFF 70%); border-color: #F5D6DD !important; }
+
+  /* Primary actions */
+  [data-testid="stBaseButton-primary"] {
+    background: linear-gradient(135deg, #A50D29 0%, #C8102E 55%, #E4234A 100%); border: none;
+    box-shadow: 0 6px 16px -6px rgba(200, 16, 46, 0.55); font-weight: 600; letter-spacing: 0.01em;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  [data-testid="stBaseButton-primary"]:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(200, 16, 46, 0.6); }
+  [data-testid="stBaseButton-primary"]:disabled { background: #E9E4EA; box-shadow: none; transform: none; }
+
+  /* Hero */
   .cg-hero {
-    background: linear-gradient(115deg, #870A3C 0%, #DC0032 60%, #F0325A 100%);
-    color: #fff; border-radius: 16px; padding: 24px 32px; margin-bottom: 4px;
+    position: relative; overflow: hidden; color: #fff; border-radius: 18px; padding: 28px 32px;
+    background:
+      radial-gradient(600px 240px at 92% -20%, rgba(255, 90, 125, 0.55), transparent 60%),
+      radial-gradient(420px 220px at 70% 130%, rgba(122, 63, 196, 0.35), transparent 60%),
+      linear-gradient(120deg, #1A0F17 0%, #4A0A22 45%, #A50D29 100%);
+    box-shadow: 0 18px 40px -22px rgba(74, 10, 34, 0.7);
+    display: flex; gap: 28px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap;
   }
-  .cg-hero.cg-analyst { background: linear-gradient(115deg, #2B1A22 0%, #5C0F2E 55%, #A8123E 100%); }
-  .cg-hero-role { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
-  .cg-hero h1 { color: #fff; font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; margin: 2px 0 0; padding: 0; }
-  .cg-hero p { color: rgba(255,255,255,0.9); margin: 6px 0 0; font-size: 1.0rem; }
+  .cg-hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.18;
+    background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 60%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 60%);
+  }
+  .cg-hero.cg-analyst {
+    background:
+      radial-gradient(600px 240px at 92% -20%, rgba(80, 130, 255, 0.35), transparent 60%),
+      radial-gradient(420px 220px at 70% 130%, rgba(228, 35, 74, 0.35), transparent 60%),
+      linear-gradient(120deg, #0F0B14 0%, #23142A 50%, #5A0B27 100%);
+  }
+  .cg-hero-main { position: relative; flex: 1 1 420px; min-width: 0; }
+  .cg-hero-role {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 0.72rem; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+  }
+  .cg-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ADE80; animation: cg-pulse 2s infinite; }
+  @keyframes cg-pulse { 0% { box-shadow: 0 0 0 0 rgba(74,222,128,.55); } 70% { box-shadow: 0 0 0 8px rgba(74,222,128,0); }
+                        100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); } }
+  .cg-hero h1 { color: #fff; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin: 12px 0 0; padding: 0; line-height: 1.15; }
+  .cg-hero h1 em { font-style: normal; background: linear-gradient(90deg, #FFB3C2, #FFFFFF 70%);
+                   -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cg-hero p { color: rgba(255,255,255,0.82); margin: 8px 0 0; font-size: 1rem; max-width: 640px; line-height: 1.5; }
+  .cg-chips { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
   .cg-chip {
-    display: inline-block; margin: 14px 8px 0 0; padding: 3px 12px; border-radius: 999px;
-    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); font-size: 0.78rem;
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 0.78rem;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.92);
   }
-  .cg-step { display: flex; align-items: center; gap: 10px; font-size: 1.08rem; font-weight: 600; }
+  .cg-chip::before { content: "\2726"; font-size: 0.7rem; color: #FFB3C2; }
+  .cg-hero-stats {
+    position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; overflow: hidden;
+    flex: 0 1 420px;
+  }
+  .cg-hero-stat { background: rgba(20, 10, 18, 0.45); padding: 12px 14px; min-width: 0; }
+  .cg-hero-stat b { display: block; font-size: 1.05rem; font-weight: 700; color: #fff; white-space: nowrap;
+                    overflow: hidden; text-overflow: ellipsis; }
+  .cg-hero-stat span { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.65); }
+
+  /* Step headers */
+  .cg-step { display: flex; align-items: center; gap: 12px; font-size: 1.08rem; font-weight: 700; color: #17131A; }
   .cg-step-num {
-    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
-    border-radius: 50%; background: #DC0032; color: #fff; font-size: 0.85rem;
+    display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none;
+    border-radius: 9px; background: linear-gradient(135deg, #A50D29, #E4234A); color: #fff; font-size: 0.85rem;
+    font-weight: 700; box-shadow: 0 4px 10px -4px rgba(200, 16, 46, 0.6);
   }
-  .cg-sub { color: #6B6B6B; font-size: 0.9rem; margin: 2px 0 6px 36px; }
+  .cg-sub { color: #6E6572; font-size: 0.9rem; margin: 2px 0 8px 42px; }
   .cg-sms {
-    background: #F6F1F2; border-left: 3px solid #DC0032; border-radius: 8px;
-    padding: 10px 14px; font-family: ui-monospace, Consolas, monospace; font-size: 0.88rem;
+    background: #17131A; color: #F4EEF2; border-radius: 12px; padding: 12px 16px;
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; font-size: 0.85rem; line-height: 1.5;
+    border-left: 3px solid #E4234A;
   }
 
   /* Application progress tracker */
-  .cg-track { display: flex; gap: 6px; margin: 8px 0 4px; flex-wrap: wrap; }
-  .cg-track-step { flex: 1 1 120px; border-top: 4px solid #E6DFE1; padding-top: 6px; font-size: 0.82rem; color: #8A8A8A; }
-  .cg-track-step.done { border-color: #1F8A4C; color: #1E1E1E; }
-  .cg-track-step.now { border-color: #DC0032; color: #1E1E1E; font-weight: 600; }
+  .cg-track { display: flex; gap: 8px; margin: 12px 0 6px; flex-wrap: wrap; }
+  .cg-track-step { flex: 1 1 120px; border-top: 4px solid #ECE7ED; padding-top: 8px; font-size: 0.82rem; color: #8F8693; }
+  .cg-track-step.done { border-color: #13804A; color: #17131A; }
+  .cg-track-step.now { border-color: #C8102E; color: #17131A; font-weight: 600; }
 
   /* KPI tiles: wrap onto a new row instead of truncating on narrow screens */
-  .cg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 6px 0 4px; }
-  .cg-kpi { border: 1px solid #E6DFE1; border-radius: 12px; padding: 14px 16px; background: #fff; min-width: 0; }
-  .cg-kpi-label { color: #5E5E5E; font-size: 0.85rem; }
-  .cg-kpi-value { font-size: 1.7rem; font-weight: 700; color: #1E1E1E; line-height: 1.25; margin-top: 4px; white-space: nowrap; }
-  .cg-unit { font-size: 0.95rem; font-weight: 500; color: #6B6B6B; margin-left: 2px; }
-  .cg-cur { font-size: 0.8rem; font-weight: 600; color: #6B6B6B; margin-right: 5px; letter-spacing: 0.03em; }
-  .cg-kpi-note { color: #6B6B6B; font-size: 0.8rem; margin-top: 6px; }
-  .cg-meter { position: relative; height: 6px; border-radius: 3px; background: #EEE8EA; margin-top: 10px; }
+  .cg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 10px 0 6px; }
+  .cg-kpi { position: relative; border: 1px solid #ECE7ED; border-radius: 12px; padding: 14px 16px;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FBFAFC 100%); min-width: 0; overflow: hidden; }
+  .cg-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #ECE7ED; }
+  .cg-kpi:first-child::before { background: linear-gradient(180deg, #A50D29, #E4234A); }
+  .cg-kpi-label { color: #6E6572; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .cg-kpi-value { font-size: 1.7rem; font-weight: 750; color: #17131A; line-height: 1.25; margin-top: 6px; white-space: nowrap;
+                  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .cg-unit { font-size: 0.95rem; font-weight: 500; color: #8F8693; margin-left: 3px; }
+  .cg-cur { font-size: 0.78rem; font-weight: 600; color: #8F8693; margin-right: 5px; letter-spacing: 0.04em; }
+  .cg-kpi-note { color: #6E6572; font-size: 0.8rem; margin-top: 6px; }
+  .cg-meter { position: relative; height: 6px; border-radius: 3px; margin-top: 10px;
+              background: linear-gradient(90deg, #FBE3E7 0 40%, #FCEFD9 40% 70%, #DDF2E5 70% 100%); }
   .cg-meter-fill { height: 6px; border-radius: 3px; }
   .cg-meter-tick { position: absolute; top: -2px; width: 2px; height: 10px; background: #fff; }
 
-  /* Sidebar */
-  .cg-side-brand { font-weight: 700; font-size: 1.1rem; color: #1E1E1E; }
-  .cg-side-brand span { color: #DC0032; }
-  .cg-side-tag { color: #6B6B6B; font-size: 0.8rem; margin-bottom: 4px; }
-  .cg-side-card { background: #fff; border: 1px solid #E6DFE1; border-radius: 12px; padding: 12px 14px; }
-  .cg-side-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #7A7A7A; margin-bottom: 6px; font-weight: 600; }
-  .cg-row { display: flex; justify-content: space-between; gap: 8px; font-size: 0.86rem; padding: 3px 0; }
-  .cg-row span:first-child { color: #6B6B6B; }
-  .cg-row span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
-  .cg-side-foot { color: #8A8A8A; font-size: 0.72rem; line-height: 1.4; }
+  /* Generative AI insight panel */
+  .cg-ai {
+    border-radius: 14px; padding: 16px 18px; border: 1px solid transparent;
+    background-image: linear-gradient(#FFFFFF, #FFFFFF), linear-gradient(135deg, #E4234A, #7A3FC4 60%, #2457C5);
+    background-origin: border-box; background-clip: padding-box, border-box;
+  }
+  .cg-ai-head { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+                text-transform: uppercase; color: #7A3FC4; }
+  .cg-ai-spark { width: 22px; height: 22px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center;
+                 color: #fff; font-size: 0.8rem; background: linear-gradient(135deg, #E4234A, #7A3FC4); }
+  .cg-ai-body { margin-top: 10px; color: #2A232D; font-size: 0.95rem; line-height: 1.6; }
+  .cg-ai-foot { margin-top: 10px; color: #8F8693; font-size: 0.75rem; }
+
+  /* Sidebar (dark rail) */
+  .cg-side-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .cg-logo {
+    width: 36px; height: 36px; border-radius: 10px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #A50D29 0%, #E4234A 60%, #FF7A93 100%); color: #fff; font-size: 1.05rem;
+    box-shadow: 0 6px 16px -6px rgba(228, 35, 74, 0.7);
+  }
+  .cg-side-name { font-weight: 800; font-size: 1.12rem; color: #FFFFFF; letter-spacing: -0.02em; line-height: 1.1; }
+  .cg-side-name span { color: #FF8BA3; }
+  .cg-side-tag { color: #A898A3; font-size: 0.74rem; letter-spacing: 0.02em; }
+  .cg-side-card { background: #241620; border: 1px solid #3A2833; border-radius: 12px; padding: 12px 14px; }
+  .cg-side-label { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: #A898A3; margin-bottom: 6px; font-weight: 700; }
+  .cg-row { display: flex; justify-content: space-between; gap: 8px; font-size: 0.85rem; padding: 4px 0;
+            border-bottom: 1px dashed #3A2833; }
+  .cg-row:last-child { border-bottom: none; }
+  .cg-row span:first-child { color: #A898A3; }
+  .cg-row span:last-child { font-weight: 600; color: #F4EEF2; text-align: right; overflow-wrap: anywhere; }
+  .cg-side-foot { color: #8C7C87; font-size: 0.7rem; line-height: 1.5; }
 </style>
 """)
 
 
-def hero(role_label, title, tagline, chips, analyst=False):
-    st.html(f'<div class="cg-hero{" cg-analyst" if analyst else ""}"><div class="cg-hero-role">{role_label}</div>'
-            f'<h1>{title}</h1><p>{tagline}</p>'
-            + "".join(f'<span class="cg-chip">{c}</span>' for c in chips) + "</div>")
+def hero(role_label, title, tagline, chips, stats=(), analyst=False):
+    stats_html = ("" if not stats else '<div class="cg-hero-stats">' + "".join(
+        f'<div class="cg-hero-stat"><b>{value}</b><span>{label}</span></div>' for label, value in stats) + "</div>")
+    chips_html = ('<div class="cg-chips">' + "".join(f'<span class="cg-chip">{c}</span>' for c in chips) + "</div>"
+                  if chips else "")
+    st.html(f'<div class="cg-hero{" cg-analyst" if analyst else ""}"><div class="cg-hero-main">'
+            f'<div class="cg-hero-role"><span class="cg-dot"></span>{role_label}</div>'
+            f'<h1>{title}</h1><p>{tagline}</p>{chips_html}</div>{stats_html}</div>')
 
 
 def step_header(number, title, subtitle):
     st.html(f'<div class="cg-step"><span class="cg-step-num">{number}</span>{title}</div>'
             f'<div class="cg-sub">{subtitle}</div>')
+
+
+def ai_insight(text, footnote):
+    st.html(f'<div class="cg-ai"><div class="cg-ai-head"><span class="cg-ai-spark">&#10022;</span>'
+            f'Generative AI insight</div><div class="cg-ai-body">{html.escape(text)}</div>'
+            f'<div class="cg-ai-foot">{footnote}</div></div>')
 
 
 def fingerprint(data):
@@ -764,8 +863,9 @@ if "toast" in st.session_state:
 
 # --- ROLE SWITCH (a demo stand-in for login: each role sees only its own view) ---
 with st.sidebar:
-    st.html('<div class="cg-side-brand">Credit<span>Genie</span></div>'
-            '<div class="cg-side-tag">Absa SME lending assistant</div>')
+    st.html('<div class="cg-side-brand"><span class="cg-logo">&#10022;</span><div>'
+            '<div class="cg-side-name">Credit<span>Genie</span></div>'
+            '<div class="cg-side-tag">Absa · AI-powered SME lending</div></div></div>')
     role = st.segmented_control("Viewing as", ROLES, default=ROLES[0], required=True, key="role",
                                 width="stretch")
 
@@ -810,11 +910,13 @@ def privacy_dialog():
 
 
 def sme_portal():
-    hero("Business owner", "Absa SME Portal",
-         "Apply for working capital by securely sharing your mobile money, WhatsApp and receipts. "
-         "No paperwork, no branch visit.", [])
+    hero("Business owner · secure session", "Working capital, <em>powered by your mobile money</em>",
+         "Apply for a business loan by securely sharing your MTN MoMo, Airtel Money, WhatsApp and receipts. "
+         "No paperwork, no branch visit.",
+         ["Bank-grade encryption", "You control consent", "Reviewed by an Absa analyst"],
+         stats=[("Paperwork", "None"), ("Loan size", "Up to K500k"), ("Data law", "DPA 2021")])
 
-    with st.container(border=True, horizontal=True, vertical_alignment="center"):
+    with st.container(border=True, key="cg_card_trust", horizontal=True, vertical_alignment="center"):
         st.markdown(":material/lock: **Your data is protected.** You choose what to share, your customers' "
                     "details are hidden from our AI, and an Absa analyst makes the final decision.")
         if st.button("How we protect your data", icon=":material/info:", type="tertiary"):
@@ -822,7 +924,7 @@ def sme_portal():
 
     app = application
     if app:
-        with st.container(border=True):
+        with st.container(border=True, key="cg_card_status"):
             head_col, badge_col = st.columns([3, 1], vertical_alignment="center")
             head_col.markdown(f"**Application {app['ref']}** · ZMW {app['requested_zmw']:,.0f} for "
                               f"{app['purpose'].lower()}")
@@ -857,7 +959,7 @@ def sme_portal():
 
     # --- STEP 1: VERIFY ---
     connection = st.session_state.connection
-    with st.container(border=True):
+    with st.container(border=True, key="cg_card_verify"):
         step_header(1, "Verify your business", "We send a one-time code to your business mobile number.")
         if connection:
             with st.container(horizontal=True, vertical_alignment="center"):
@@ -885,7 +987,7 @@ def sme_portal():
                 getattr(st, kind)(message)
 
     # --- STEP 2: SHARE DATA ---
-    with st.container(border=True):
+    with st.container(border=True, key="cg_card_share"):
         step_header(2, "Share your business records",
                     "Connect your accounts, upload receipts, or paste messages. The more you share, the better.")
         tab_sync, tab_image, tab_text = st.tabs(["Connect accounts", "Upload receipts", "Paste messages"])
@@ -975,7 +1077,7 @@ def sme_portal():
     unsent_images = sum("image" in e for e in unsent)
 
     # --- STEP 3: APPLY ---
-    with st.container(border=True):
+    with st.container(border=True, key="cg_card_apply"):
         if app:
             step_header(3, "Send more documents", "Anything new is added to your existing application.")
         else:
@@ -1294,14 +1396,16 @@ def record_decision(report, app):
 
 
 def analyst_dashboard():
-    hero("Absa credit analyst", "CreditGenie Analyst Workbench",
+    hero("Absa credit analyst · workbench", "AI credit <em>decisioning workbench</em>",
          "The AI agent prepares the credit assessment from the SME's shared data. You make the final decision.",
          ["Multimodal GenAI", "PII masked before AI", "Policy-guarded", "Human decision & audit trail"],
+         stats=[("Model", html.escape(MODEL_NAME)), ("Cases open", "1" if application else "0"),
+                ("Assessments", str(len(case["history"])))],
          analyst=True)
 
     app = application
     if app is None:
-        with st.container(border=True):
+        with st.container(border=True, key="cg_card_empty"):
             st.markdown("#### :material/inbox: No applications waiting")
             st.caption("Switch to **SME Portal** in the sidebar, verify a business, share data and submit an "
                        "application. It will appear here.")
@@ -1310,7 +1414,7 @@ def analyst_dashboard():
     new_items = [e for e in app["evidence"] if e["fp"] not in case["processed"]]
 
     # --- APPLICATION ---
-    with st.container(border=True):
+    with st.container(border=True, key="cg_card_application"):
         head_col, badge_col = st.columns([3, 1], vertical_alignment="center")
         head_col.markdown(f"#### {html.escape(app['business_name'])}")
         head_col.caption(f"Application {app['ref']} · ZMW {app['requested_zmw']:,.0f} for {app['purpose'].lower()} · "
@@ -1331,8 +1435,8 @@ def analyst_dashboard():
                     icon=":material/notifications:")
 
     # --- RUN ---
-    with st.container(border=True):
-        st.markdown("**AI agent persona**")
+    with st.container(border=True, key="cg_card_run"):
+        st.markdown("**:material/smart_toy: AI agent persona**")
         persona = st.radio("Agent persona", PERSONAS, captions=PERSONA_CAPTIONS, horizontal=True,
                            label_visibility="collapsed", key="persona")
         new_images = sum("image" in e for e in new_items)
@@ -1371,9 +1475,9 @@ def analyst_dashboard():
     res = report["result"]
 
     # --- AI ASSESSMENT ---
-    with st.container(border=True):
+    with st.container(border=True, key="cg_card_assessment"):
         title_col, badge_col = st.columns([3, 2], vertical_alignment="center")
-        title_col.markdown("### AI credit assessment")
+        title_col.markdown("### :material/auto_awesome: AI credit assessment")
         title_col.caption(f"{report['persona']} · {pretty_time(report['generated_at'])} · "
                           f"Assessment {report['assessment_number']} of case {report['case_id']} · "
                           f"Audit ID `{report['audit_id']}`")
@@ -1426,8 +1530,9 @@ def analyst_dashboard():
                 st.altair_chart((bars + labels).properties(height=300), width="stretch")
 
             with summary_col:
-                st.markdown("**Agent's summary**")
-                st.write(report["agent_summary"])
+                ai_insight(report["agent_summary"],
+                           f"{html.escape(report['persona'])} · {html.escape(report['model'])} · "
+                           "AI-generated - checked by Absa policy rules")
                 if report["policy_guardrails_applied"]:
                     st.markdown("**Policy guardrails applied**")
                     for note in report["policy_guardrails_applied"]:
@@ -1535,8 +1640,8 @@ def analyst_dashboard():
                 )
 
     # --- ANALYST DECISION (human in the loop) ---
-    with st.container(border=True):
-        st.markdown("### Your decision")
+    with st.container(border=True, key="cg_card_decision"):
+        st.markdown("### :material/gavel: Your decision")
         decision = report["analyst_decision"]
         if decision:
             st.success(f"**{app['status']}**" + (f" · ZMW {decision['amount_zmw']:,.0f}" if decision["amount_zmw"] else "")

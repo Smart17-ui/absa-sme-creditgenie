@@ -3,8 +3,38 @@ maxUploadSize = 10  # MB per file - a receipt photo is well under this
 
 [theme]
 base = "light"
-primaryColor = "#DC0032"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F6F1F2"
-textColor = "#1E1E1E"
-font = "sans serif"
+primaryColor = "#C8102E"
+backgroundColor = "#F7F6F8"
+secondaryBackgroundColor = "#EFECF0"
+textColor = "#17131A"
+borderColor = "#E3DEE4"
+linkColor = "#A50D29"
+linkUnderline = false
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+baseRadius = "10px"
+buttonRadius = "8px"
+showWidgetBorder = true
+showSidebarBorder = false
+headingFontWeights = [700, 700, 650, 600, 600, 600]
+paddingTop = "1.25rem"
+paddingBottom = "3rem"
+greenColor = "#13804A"
+orangeColor = "#B86E00"
+redColor = "#C8102E"
+blueColor = "#2457C5"
+dataframeHeaderBackgroundColor = "#F2EFF3"
+dataframeBorderColor = "#E3DEE4"
+chartCategoricalColors = ["#2457C5", "#E0662F", "#13804A", "#7A3FC4", "#C8102E", "#B86E00"]
+
+# Dark, private-banking style navigation rail
+[theme.sidebar]
+backgroundColor = "#1A0F17"
+secondaryBackgroundColor = "#2A1A25"
+codeBackgroundColor = "#2A1A25"
+textColor = "#F4EEF2"
+borderColor = "#3A2833"
+primaryColor = "#E4234A"
+linkColor = "#FF8BA3"
+paddingTop = "1rem"
