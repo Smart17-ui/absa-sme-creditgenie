@@ -3,3 +3,6 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Stored applications and customer documents - never commit
+data/
